@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  clerkId         String    @unique @map("clerk_id")
+  email           String    @unique
+  name            String?
+  trialStartedAt  DateTime? @map("trial_started_at") @db.Timestamptz
+  trialExpiresAt  DateTime? @map("trial_expires_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  profiles     Profile[]
+  readings     Reading[]
+  subscription Subscription?
+
+  @@map("users")
+}
+
+model Profile {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  name        String
+  dob         DateTime? @db.Date
+  isDefault   Boolean   @default(false) @map("is_default")
+  avatarEmoji String?   @map("avatar_emoji")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readings   Reading[]
+  horoscopes Horoscope[]
+
+  @@map("profiles")
+}
+
+model Subscription {
+  id                   String   @id @default(uuid()) @db.Uuid
+  userId               String   @unique @map("user_id") @db.Uuid
+  stripeCustomerId     String?  @map("stripe_customer_id")
+  stripeSubscriptionId String?  @map("stripe_subscription_id")
+  plan                 String   // 'pro' | 'ultimate'
+  status               String   // 'trialing' | 'active' | 'past_due' | 'canceled' | 'expired'
+  currentPeriodEnd     DateTime? @map("current_period_end") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model Reading {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  profileId    String   @map("profile_id") @db.Uuid
+  imageUrl     String?  @map("image_url")
+  status       String   @default("pending") // 'pending' | 'processing' | 'completed' | 'failed'
+  analysisJson Json?    @map("analysis_json")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("readings")
+}
+
+model Horoscope {
+  id          String   @id @default(uuid()) @db.Uuid
+  profileId   String   @map("profile_id") @db.Uuid
+  date        DateTime @db.Date
+  sign        String
+  contentJson Json?    @map("content_json")
+  generatedAt DateTime @default(now()) @map("generated_at") @db.Timestamptz
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, date])
+  @@map("horoscopes")
+}
