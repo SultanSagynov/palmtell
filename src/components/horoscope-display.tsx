@@ -23,6 +23,7 @@ interface Profile {
   name: string;
   dob: string | null;
   avatarEmoji?: string;
+  isDefault: boolean;
 }
 
 interface DailyHoroscope {

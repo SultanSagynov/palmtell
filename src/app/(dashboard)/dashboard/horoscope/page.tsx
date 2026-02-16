@@ -15,6 +15,7 @@ interface Profile {
   name: string;
   dob: string | null;
   avatarEmoji?: string;
+  isDefault: boolean;
 }
 
 export default function HoroscopePage() {
