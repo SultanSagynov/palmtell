@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getAccessTier } from "@/lib/access";
 import { generateCompatibilityReading } from "@/lib/compatibility";
+import { PalmAnalysis } from "@/types";
 
 export async function POST(req: Request) {
   const { userId: clerkId } = await auth();
@@ -82,11 +83,11 @@ export async function POST(req: Request) {
     const compatibility = await generateCompatibilityReading(
       {
         profile: profileA,
-        analysis: profileA.readings[0].analysisJson,
+        analysis: profileA.readings[0].analysisJson as unknown as PalmAnalysis,
       },
       {
         profile: profileB,
-        analysis: profileB.readings[0].analysisJson,
+        analysis: profileB.readings[0].analysisJson as unknown as PalmAnalysis,
       }
     );
 

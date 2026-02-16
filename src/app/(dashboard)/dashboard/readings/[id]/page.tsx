@@ -8,12 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ReadingResultDisplay } from "@/components/reading-result-display";
 import { Loader2, AlertCircle, Clock } from "lucide-react";
+import { PalmAnalysis } from "@/types";
 
 interface Reading {
   id: string;
   status: string;
   imageUrl?: string;
-  analysisJson?: any;
+  analysisJson?: PalmAnalysis;
   createdAt: string;
   profile: {
     name: string;
