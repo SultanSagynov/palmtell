@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getStripe } from "@/lib/stripe";
+import { getCustomerPortalUrl } from "@/lib/lemonsqueezy";
 
 export async function GET() {
   const { userId: clerkId } = await auth();
@@ -14,18 +14,15 @@ export async function GET() {
     include: { subscription: true },
   });
 
-  if (!user?.subscription?.stripeCustomerId) {
+  if (!user?.subscription?.lsSubscriptionId) {
     return NextResponse.json(
       { error: "No active subscription" },
       { status: 404 }
     );
   }
 
-  const stripe = getStripe();
-  const session = await stripe.billingPortal.sessions.create({
-    customer: user.subscription.stripeCustomerId,
-    return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing`,
-  });
+  // Lemon Squeezy provides a general customer portal
+  const portalUrl = getCustomerPortalUrl();
 
-  return NextResponse.json({ url: session.url });
+  return NextResponse.json({ url: portalUrl });
 }

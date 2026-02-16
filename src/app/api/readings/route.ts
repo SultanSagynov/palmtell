@@ -74,47 +74,150 @@ export async function POST(req: Request) {
     }
   }
 
-  const body = await req.json();
-  const { profileId } = body as { profileId: string };
+  try {
+    // Check if this is a JSON request (temp image flow) or FormData (direct upload)
+    const contentType = req.headers.get("content-type");
+    let profileId: string;
+    let image: File | null = null;
+    let tempImageUrl: string | null = null;
+    let tempImageKey: string | null = null;
 
-  if (!profileId) {
-    return NextResponse.json(
-      { error: "Profile ID is required" },
-      { status: 400 }
-    );
-  }
+    if (contentType?.includes("application/json")) {
+      // Handle temp image flow from Session 5 onboarding
+      const body = await req.json();
+      profileId = body.profileId;
+      tempImageUrl = body.tempImageUrl;
+      tempImageKey = body.tempImageKey;
 
-  // Verify profile belongs to user
-  const profile = await db.profile.findFirst({
-    where: { id: profileId, userId: user.id },
-  });
+      if (!profileId) {
+        return NextResponse.json(
+          { error: "Profile ID is required" },
+          { status: 400 }
+        );
+      }
 
-  if (!profile) {
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-  }
+      if (!tempImageUrl || !tempImageKey) {
+        return NextResponse.json(
+          { error: "Temporary image data is required" },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Handle direct upload flow
+      const formData = await req.formData();
+      profileId = formData.get("profileId") as string;
+      image = formData.get("image") as File;
 
-  // Start trial if first reading
-  if (!user.trialStartedAt) {
-    await db.user.update({
-      where: { id: user.id },
+      if (!profileId) {
+        return NextResponse.json(
+          { error: "Profile ID is required" },
+          { status: 400 }
+        );
+      }
+
+      if (!image) {
+        return NextResponse.json(
+          { error: "Image is required" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validate image file (only for direct upload)
+    if (image) {
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+      if (!allowedTypes.includes(image.type)) {
+        return NextResponse.json(
+          { error: "Invalid image type. Please upload JPG, PNG, WEBP, or HEIC." },
+          { status: 400 }
+        );
+      }
+
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (image.size > maxSize) {
+        return NextResponse.json(
+          { error: "Image too large. Please upload an image under 10MB." },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Verify profile belongs to user
+    const profile = await db.profile.findFirst({
+      where: { id: profileId, userId: user.id },
+    });
+
+    if (!profile) {
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    }
+
+    // Start trial if first reading
+    if (!user.trialStartedAt) {
+      await db.user.update({
+        where: { id: user.id },
+        data: {
+          trialStartedAt: new Date(),
+          trialExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+      });
+    }
+
+    // Create reading in pending state
+    const reading = await db.reading.create({
       data: {
-        trialStartedAt: new Date(),
-        trialExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        userId: user.id,
+        profileId,
+        status: "pending",
       },
     });
-  }
 
-  // Create reading in pending state
-  const reading = await db.reading.create({
-    data: {
+    // Handle image upload or use temp image
+    let imageUrl: string;
+    
+    if (tempImageUrl) {
+      // Use existing temp image
+      imageUrl = tempImageUrl;
+      
+      // Move temp image to permanent location
+      const { uploadToR2, generateImageKey } = await import("@/lib/r2");
+      const imageKey = generateImageKey(user.id, reading.id);
+      
+      // Copy from temp location to permanent location
+      // For now, we'll use the temp URL as-is and clean up later
+      imageUrl = tempImageUrl;
+    } else if (image) {
+      // Upload new image to R2
+      const { uploadToR2, generateImageKey } = await import("@/lib/r2");
+      const buffer = Buffer.from(await image.arrayBuffer());
+      const imageKey = generateImageKey(user.id, reading.id);
+      imageUrl = await uploadToR2(buffer, imageKey, image.type);
+    } else {
+      return NextResponse.json(
+        { error: "No image provided" },
+        { status: 400 }
+      );
+    }
+
+    // Update reading with image URL
+    await db.reading.update({
+      where: { id: reading.id },
+      data: { imageUrl },
+    });
+
+    // Enqueue AI analysis job
+    const { enqueueAnalysisJob } = await import("@/lib/queue");
+    await enqueueAnalysisJob({
+      readingId: reading.id,
+      imageUrl,
       userId: user.id,
-      profileId,
-      status: "pending",
-    },
-  });
+    });
 
-  // TODO: Enqueue AI analysis job (QStash/BullMQ)
-  // For now, mark as pending — the analysis pipeline will be implemented in a later session
-
-  return NextResponse.json({ reading }, { status: 201 });
+    return NextResponse.json({ reading: { ...reading, imageUrl } }, { status: 201 });
+  } catch (error) {
+    console.error("Reading creation error:", error);
+    return NextResponse.json(
+      { error: "Failed to create reading" },
+      { status: 500 }
+    );
+  }
 }

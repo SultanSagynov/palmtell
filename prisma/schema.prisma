@@ -42,11 +42,13 @@ model Profile {
 model Subscription {
   id                   String   @id @default(uuid()) @db.Uuid
   userId               String   @unique @map("user_id") @db.Uuid
-  stripeCustomerId     String?  @map("stripe_customer_id")
-  stripeSubscriptionId String?  @map("stripe_subscription_id")
+  lsCustomerId         String?  @map("ls_customer_id")
+  lsSubscriptionId     String?  @map("ls_subscription_id")
   plan                 String   // 'pro' | 'ultimate'
-  status               String   // 'trialing' | 'active' | 'past_due' | 'canceled' | 'expired'
+  status               String   // 'active' | 'past_due' | 'canceled' | 'expired'
   currentPeriodEnd     DateTime? @map("current_period_end") @db.Timestamptz
+  cancelsAt            DateTime? @map("cancels_at") @db.Timestamptz
+  pendingPlan          String?  @map("pending_plan") // for plan change workflows
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

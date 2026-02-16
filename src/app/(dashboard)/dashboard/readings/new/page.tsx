@@ -1,14 +1,63 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Camera, Upload } from "lucide-react";
-import type { Metadata } from "next";
+import { PalmUpload } from "@/components/palm-upload";
+import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import { DISCLAIMER } from "@/lib/constants";
 
-export const metadata: Metadata = {
-  title: "New Reading",
-};
-
 export default function NewReadingPage() {
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [selectedProfileId, setSelectedProfileId] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+  const { user } = useUser();
+
+  useEffect(() => {
+    async function fetchProfiles() {
+      try {
+        const response = await fetch("/api/profiles");
+        const data = await response.json();
+        setProfiles(data.profiles || []);
+        
+        // Select default profile
+        const defaultProfile = data.profiles?.find((p: any) => p.isDefault);
+        if (defaultProfile) {
+          setSelectedProfileId(defaultProfile.id);
+        }
+      } catch (error) {
+        console.error("Failed to fetch profiles:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    if (user) {
+      fetchProfiles();
+    }
+  }, [user]);
+
+  const handleUploadSuccess = (readingId: string) => {
+    router.push(`/dashboard/readings/${readingId}`);
+  };
+
+  const handleUploadError = (error: string) => {
+    // TODO: Show toast notification
+    console.error("Upload error:", error);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-8">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-2"></div>
+          <div className="h-4 bg-muted rounded w-2/3"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <div>
@@ -18,38 +67,43 @@ export default function NewReadingPage() {
         </p>
       </div>
 
-      {/* Upload area */}
-      <Card className="border-border/40">
-        <CardHeader>
-          <CardTitle>Upload Palm Photo</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center rounded-lg border-2 border-dashed border-border/60 bg-muted/20 py-16">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <Upload className="h-8 w-8" />
+      {/* Profile Selection */}
+      {profiles.length > 1 && (
+        <Card className="border-border/40">
+          <CardHeader>
+            <CardTitle className="text-base">Reading For</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 flex-wrap">
+              {profiles.map((profile) => (
+                <button
+                  key={profile.id}
+                  onClick={() => setSelectedProfileId(profile.id)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    selectedProfileId === profile.id
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted hover:bg-muted/80"
+                  }`}
+                >
+                  {profile.avatarEmoji && (
+                    <span className="mr-1">{profile.avatarEmoji}</span>
+                  )}
+                  {profile.name}
+                </button>
+              ))}
             </div>
-            <p className="mt-4 text-sm font-medium">
-              Drag & drop your palm photo here
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              JPG, PNG, WEBP, or HEIC up to 10MB
-            </p>
-            <div className="mt-6 flex gap-3">
-              <Button className="gap-2" disabled>
-                <Upload className="h-4 w-4" />
-                Choose File
-              </Button>
-              <Button variant="outline" className="gap-2" disabled>
-                <Camera className="h-4 w-4" />
-                Take Photo
-              </Button>
-            </div>
-            <p className="mt-4 text-xs text-muted-foreground">
-              Upload functionality coming in the next update.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Upload Component */}
+      {selectedProfileId && (
+        <PalmUpload
+          profileId={selectedProfileId}
+          onUploadSuccess={handleUploadSuccess}
+          onUploadError={handleUploadError}
+        />
+      )}
 
       {/* Tips */}
       <Card className="border-border/40">

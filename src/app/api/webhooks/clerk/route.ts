@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { db } from "@/lib/db";
+import { sendEmail, createWelcomeEmail } from "@/lib/email";
 
 export async function POST(req: Request) {
   const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
@@ -70,6 +71,15 @@ export async function POST(req: Request) {
         },
       },
     });
+
+    // Send welcome email
+    try {
+      const welcomeEmail = createWelcomeEmail(email, name || "there");
+      await sendEmail(welcomeEmail);
+    } catch (error) {
+      console.error("Failed to send welcome email:", error);
+      // Don't fail the webhook if email fails
+    }
   }
 
   return NextResponse.json({ received: true });

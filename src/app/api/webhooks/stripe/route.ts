@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { db } from "@/lib/db";
 import { getStripe } from "@/lib/stripe";
+import { sendEmail, createSubscriptionCanceledEmail } from "@/lib/email";
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -81,6 +82,18 @@ export async function POST(req: Request) {
           where: { userId },
           data: { status: "canceled" },
         });
+
+        // Send cancellation email
+        try {
+          const user = await db.user.findUnique({ where: { id: userId } });
+          if (user) {
+            const endDate = new Date((subscription as any).current_period_end * 1000).toLocaleDateString();
+            const cancelEmail = createSubscriptionCanceledEmail(user.email, user.name || "there", endDate);
+            await sendEmail(cancelEmail);
+          }
+        } catch (error) {
+          console.error("Failed to send cancellation email:", error);
+        }
       }
       break;
     }

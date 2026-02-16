@@ -1,14 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getStripe } from "@/lib/stripe";
-
-const PRICE_MAP: Record<string, string | undefined> = {
-  pro_monthly: process.env.STRIPE_PRO_PRICE_ID,
-  pro_annual: process.env.STRIPE_PRO_ANNUAL_PRICE_ID,
-  ultimate_monthly: process.env.STRIPE_ULTIMATE_PRICE_ID,
-  ultimate_annual: process.env.STRIPE_ULTIMATE_ANNUAL_PRICE_ID,
-};
+import { createLemonSqueezyCheckout } from "@/lib/lemonsqueezy";
 
 export async function POST(req: Request) {
   const { userId: clerkId } = await auth();
@@ -17,12 +10,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { priceKey } = body as { priceKey: string };
-
-  const priceId = PRICE_MAP[priceKey];
-  if (!priceId) {
-    return NextResponse.json({ error: "Invalid price" }, { status: 400 });
-  }
+  const { plan, interval } = body as { plan: 'pro' | 'ultimate', interval: 'month' | 'year' };
 
   const user = await db.user.findUnique({
     where: { clerkId },
@@ -33,18 +21,44 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const stripe = getStripe();
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    payment_method_types: ["card"],
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?upgraded=true`,
-    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing`,
-    customer_email: user.email,
-    subscription_data: {
-      metadata: { user_id: user.id },
-    },
-  });
+  try {
+    // Handle existing subscription - Lemon Squeezy requires manual cancellation for plan changes
+    if (user.subscription?.lsSubscriptionId && user.subscription.status === 'active') {
+      // For plan changes, we'll need to cancel the current subscription first
+      // This will be handled in the UI with proper messaging
+      const planHierarchy = { pro: 1, ultimate: 2 };
+      const currentTier = planHierarchy[user.subscription.plan as keyof typeof planHierarchy] || 0;
+      const newTier = planHierarchy[plan as keyof typeof planHierarchy] || 0;
+      
+      if (currentTier !== newTier) {
+        // Store pending plan change for UI messaging
+        await db.subscription.update({
+          where: { userId: user.id },
+          data: { pendingPlan: plan },
+        });
+        
+        return NextResponse.json({ 
+          error: "Plan change requires canceling current subscription first",
+          requiresCancellation: true,
+          currentPlan: user.subscription.plan,
+          newPlan: plan
+        }, { status: 409 });
+      }
+    }
 
-  return NextResponse.json({ url: session.url });
+    const checkoutUrl = await createLemonSqueezyCheckout({
+      plan,
+      interval,
+      userId: user.id,
+      userEmail: user.email,
+    });
+
+    return NextResponse.json({ url: checkoutUrl });
+  } catch (error) {
+    console.error("Lemon Squeezy checkout error:", error);
+    return NextResponse.json(
+      { error: "Failed to create checkout session" },
+      { status: 500 }
+    );
+  }
 }

@@ -104,10 +104,10 @@ export default function HomePage() {
               free for 7 days.
             </p>
             <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-              <Link href="/free-reading">
+              <Link href="/try">
                 <Button size="lg" className="gap-2 text-base">
                   <Hand className="h-5 w-5" />
-                  Read My Palm — Free
+                  Try Free — Read My Palm
                 </Button>
               </Link>
               <Link href="/pricing">
@@ -196,7 +196,7 @@ export default function HomePage() {
             <p className="mt-4 text-muted-foreground">
               Your first reading is completely free. No credit card needed.
             </p>
-            <Link href="/free-reading" className="mt-8 inline-block">
+            <Link href="/try" className="mt-8 inline-block">
               <Button size="lg" className="gap-2 text-base">
                 <Hand className="h-5 w-5" />
                 Try Free — Read My Palm

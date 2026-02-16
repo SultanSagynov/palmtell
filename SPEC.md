@@ -1,4 +1,4 @@
-# Palmtell — Technical Specification (LLM-ready)
+# PalmTell — Technical Specification (LLM-ready)
 
 ## Product
 B2C SaaS web app. Users upload palm photo → AI analysis → personality, life insights, career advice. Optional horoscope by birth date for retention.
@@ -22,7 +22,7 @@ First reading is fully unlocked for 7 days at no cost. No credit card required t
 | File storage | Cloudflare R2 (palm photo uploads, no egress fees) |
 | AI — palm analysis | OpenAI GPT-4o Vision API (image + prompt → JSON) |
 | AI — horoscope | Aztro API (RapidAPI) for daily; LLM call for personalized monthly |
-| Payments | Stripe (Checkout + Subscriptions + Customer Portal + Webhooks) |
+| Payments | Lemon Squeezy (Merchant of Record — handles all taxes globally) |
 | Email | Resend.com (transactional: welcome, trial expiry warning, receipts) |
 | Job queue | Upstash QStash or BullMQ+Upstash Redis (async AI processing) |
 | CDN | Cloudflare |
@@ -55,11 +55,14 @@ profiles
 subscriptions
   id uuid PK
   user_id uuid FK users
-  stripe_customer_id text
-  stripe_subscription_id text
-  plan text                     -- 'pro' | 'ultimate'
-  status text                   -- 'trialing'|'active'|'past_due'|'canceled'|'expired'
-  current_period_end timestamptz
+  ls_customer_id text          -- Lemon Squeezy customer ID
+  ls_subscription_id text      -- Lemon Squeezy subscription ID
+  ls_variant_id text           -- which product variant
+  plan text                    -- 'pro' | 'ultimate'
+  status text                  -- 'active'|'past_due'|'canceled'|'expired'
+  renews_at timestamptz        -- next billing date
+  ends_at timestamptz          -- set when canceled, null if active
+  created_at timestamptz
 
 readings
   id uuid PK
@@ -89,7 +92,7 @@ Clerk handles everything — no custom auth code needed:
 - Session management (JWT)
 - Middleware: `clerkMiddleware()` in Next.js to protect routes
 
-Protected routes: `/dashboard/*`, `/api/*` (except `/api/webhooks/stripe`, `/api/public/*`)
+Protected routes: `/dashboard/*`, `/api/*` (except `/api/webhooks/lemonsqueezy`, `/api/public/*`)
 
 After Clerk registration webhook fires → create `users` row in DB.
 
@@ -238,7 +241,7 @@ if (profileCount >= limits[subscription.plan]) {
 ```
 
 
-## Subscription Plans & Stripe
+## Subscription Plans & Lemon Squeezy
 
 ### Access model
 
@@ -277,22 +280,137 @@ function getAccessTier(user, subscription) {
 
 Locked sections rendered blurred with upgrade CTA overlay. Full `analysis_json` always stored — gating is render-time only.
 
-### Stripe Integration
+### Lemon Squeezy Integration
 
-- **Checkout:** `POST /api/billing/checkout` → create Stripe Checkout Session → redirect
-- **Portal:** `GET /api/billing/portal` → Stripe Customer Portal URL (plan change, cancel, update card)
-- **Webhooks** `POST /api/webhooks/stripe` (no auth, verify Stripe-Signature header):
-  - `customer.subscription.created/updated` → upsert `subscriptions` row
-  - `customer.subscription.deleted` → set status `canceled`
-  - `invoice.payment_failed` → set status `past_due`
+**Why Lemon Squeezy:** Acts as Merchant of Record (MoR) — handles all global tax compliance (VAT, sales tax), payment processing, and fraud protection. Works for individual developers worldwide (including Kazakhstan) without requiring a registered company. Commission: 5% + $0.50 per transaction.
+
+**Setup:**
+1. Create products in Lemon Squeezy dashboard:
+   - Pro Monthly ($9.99/mo)
+   - Pro Annual ($95.90/yr)
+   - Ultimate Monthly ($19.99/mo)
+   - Ultimate Annual ($191.90/yr)
+2. Each product has a `variant_id` (used in API calls)
+3. Store variant IDs in env vars: `LS_PRO_MONTHLY_ID`, `LS_PRO_ANNUAL_ID`, etc.
+
+**Checkout flow:**
+```typescript
+// POST /api/billing/checkout
+import { lemonSqueezySetup } from "@lemonsqueezy/lemonsqueezy.js";
+
+lemonSqueezySetup({ apiKey: process.env.LEMON_SQUEEZY_API_KEY });
+
+const checkout = await createCheckout(process.env.LS_STORE_ID, variantId, {
+  checkoutData: {
+    email: user.email,
+    custom: {
+      user_id: user.id, // passed to webhook
+    },
+  },
+  productOptions: {
+    redirectUrl: `${process.env.NEXT_PUBLIC_URL}/dashboard?success=true`,
+  },
+});
+
+return { url: checkout.data.data.attributes.url };
+```
+
+**Customer Portal:**
+Lemon Squeezy provides a hosted customer portal. Get the URL via:
+```typescript
+// GET /api/billing/portal
+const customerPortalUrl = `https://app.lemonsqueezy.com/my-orders`;
+// Or fetch user-specific orders and generate links dynamically
+```
+
+**Webhooks** `POST /api/webhooks/lemonsqueezy` (verify signature via `crypto.createHmac`):
+
+Key events to handle:
+- `order_created` → one-time purchase or first subscription payment
+- `subscription_created` → new subscription started
+- `subscription_updated` → plan changed, renewed, or status updated
+- `subscription_cancelled` → user canceled (access continues to `ends_at`)
+- `subscription_expired` → subscription period ended, revoke access
+- `subscription_payment_success` → recurring payment succeeded
+- `subscription_payment_failed` → payment failed, mark as `past_due`
+
+Webhook signature verification:
+```typescript
+import crypto from 'crypto';
+
+const signature = req.headers['x-signature'];
+const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET;
+const hmac = crypto.createHmac('sha256', secret);
+hmac.update(JSON.stringify(req.body));
+const digest = hmac.digest('hex');
+
+if (signature !== digest) return res.status(401).end();
+```
+
+**Subscription data structure (from webhook):**
+```json
+{
+  "meta": {
+    "event_name": "subscription_created",
+    "custom_data": { "user_id": "..." }
+  },
+  "data": {
+    "id": "123456",
+    "type": "subscriptions",
+    "attributes": {
+      "store_id": 12345,
+      "customer_id": 67890,
+      "product_id": 111,
+      "variant_id": 222,
+      "status": "active",
+      "renews_at": "2026-03-15T00:00:00Z",
+      "ends_at": null,
+      "trial_ends_at": null
+    }
+  }
+}
+```
+
+Map `variant_id` to your internal plan:
+```typescript
+const variantToPlan = {
+  [process.env.LS_PRO_MONTHLY_ID]: 'pro',
+  [process.env.LS_PRO_ANNUAL_ID]: 'pro',
+  [process.env.LS_ULTIMATE_MONTHLY_ID]: 'ultimate',
+  [process.env.LS_ULTIMATE_ANNUAL_ID]: 'ultimate',
+};
+
+const plan = variantToPlan[webhookData.data.attributes.variant_id];
+```
 
 ### Plan transitions
 
-**Upgrade (any → Pro/Ultimate):** immediate effect. Stripe proration auto-calculated.
+**Upgrade (any → Pro/Ultimate):** 
+Lemon Squeezy doesn't auto-prorate. User must cancel current subscription and start new one. Handle in UI:
+1. Cancel current subscription (keeps access until `ends_at`)
+2. Start new subscription immediately
+3. Update DB with new plan
 
-**Downgrade (Ultimate → Pro):** takes effect at end of current billing period. Store `pending_plan` on subscription. Show in UI: *"Your plan will change to Pro on March 1."*
+**Downgrade (Ultimate → Pro):**
+Same flow — cancel current, subscribe to lower tier. Access continues until end of paid period.
 
-**Cancellation:** access continues until `current_period_end`. After that webhook fires → status `expired` → user drops to 3 basic sections. Extra profiles become read-only (history visible, no new readings). Banner: *"You have 2 saved profiles. Upgrade to Pro to add new readings for them."*
+**Cancellation:**
+Call Lemon Squeezy API: `DELETE /v1/subscriptions/{id}`
+- `status` becomes `cancelled`
+- `ends_at` is set to end of current billing period
+- User retains access until `ends_at`
+- Webhook `subscription_expired` fires when period ends → revoke access
+
+**DB update on cancellation:**
+```typescript
+await prisma.subscription.update({
+  where: { ls_subscription_id: id },
+  data: { 
+    status: 'canceled',
+    cancels_at: new Date(endsAt),
+  }
+});
+```
 
 ---
 
@@ -321,9 +439,9 @@ PUT    /api/profiles/:id          update profile (name, dob, emoji)
 DELETE /api/profiles/:id          delete non-default profile
 GET    /api/horoscope/daily       daily horoscope for a profile (?profile_id=)
 GET    /api/horoscope/monthly     monthly forecast Pro+ (?profile_id=)
-POST   /api/billing/checkout      create Stripe checkout session
-GET    /api/billing/portal        Stripe portal URL
-POST   /api/webhooks/stripe       Stripe webhook
+POST   /api/billing/checkout      create Lemon Squeezy checkout session
+GET    /api/billing/portal        Lemon Squeezy portal URL
+POST   /api/webhooks/lemonsqueezy Lemon Squeezy webhook
 POST   /api/webhooks/clerk        Clerk user sync → create default profile on registration
 GET    /api/public/horoscope/:sign  public daily (no auth, for SEO)
 ```
@@ -409,8 +527,8 @@ Landing page
 |---|---|---|
 | Email verified | Welcome email | "Your reading is ready" + link to dashboard |
 | Day 6 of trial | Expiry warning | "Tomorrow some features will be locked — upgrade to keep full access" |
-| Subscription activated | Receipt | Stripe-generated receipt (automatic) |
-| Payment failed | Dunning | Stripe-generated (automatic, 1 email) |
+| Subscription activated | Receipt | Lemon Squeezy-generated receipt (automatic) |
+| Payment failed | Dunning | Lemon Squeezy-generated (automatic, 1 email) |
 | Subscription canceled | Confirmation | "Access continues until [date]" |
 
 **What is NEVER sent:**
@@ -478,14 +596,14 @@ OPENAI_API_KEY=                   # GPT-4o Vision for palm analysis + horoscope 
 # Horoscope
 RAPIDAPI_KEY=                     # for Aztro daily horoscope
 
-# Stripe
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
-STRIPE_PRO_PRICE_ID=
-STRIPE_PRO_ANNUAL_PRICE_ID=
-STRIPE_ULTIMATE_PRICE_ID=
-STRIPE_ULTIMATE_ANNUAL_PRICE_ID=
+# Lemon Squeezy
+LEMON_SQUEEZY_API_KEY=           # from lemonsqueezy.com settings
+LEMON_SQUEEZY_WEBHOOK_SECRET=    # webhook signing secret
+LS_STORE_ID=                     # your store ID (numeric)
+LS_PRO_MONTHLY_ID=               # variant ID for Pro monthly
+LS_PRO_ANNUAL_ID=                # variant ID for Pro annual
+LS_ULTIMATE_MONTHLY_ID=          # variant ID for Ultimate monthly
+LS_ULTIMATE_ANNUAL_ID=           # variant ID for Ultimate annual
 
 # Email
 RESEND_API_KEY=
@@ -515,15 +633,15 @@ UPSTASH_REDIS_REST_TOKEN=
 
 **Что точно НЕ бесплатно с первого дня:**
 - **OpenAI GPT-4o Vision** — ~$0.01–0.03 за анализ (платишь за токены). При 100 анализах/мес = $1–3. Это ОК.
-- **Stripe** — 2.9% + $0.30 с каждой транзакции. Платишь только когда зарабатываешь.
+- **Lemon Squeezy** — 5% + $0.50 с каждой транзакции. Платишь только когда зарабатываешь. Зато они берут на себя все налоги глобально — это того стоит.
 
-**Вывод:** реальные затраты на инфраструктуру до первых ~500 юзеров — это только OpenAI API и Stripe комиссия. Всё остальное укладывается в free tiers.
+**Вывод:** реальные затраты на инфраструктуру до первых ~500 юзеров — это только OpenAI API и Lemon Squeezy комиссия. Всё остальное укладывается в free tiers.
 
 ---
 
 ## Disclaimer (must appear on every reading)
 
-> Palmtell readings are generated by AI for entertainment purposes only. Not medical, psychological, financial, or legal advice.
+> PalmTell readings are generated by AI for entertainment purposes only. Not medical, psychological, financial, or legal advice.
 
 ---
 
