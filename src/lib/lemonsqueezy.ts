@@ -59,6 +59,9 @@ export async function createLemonSqueezyCheckout(data: CheckoutData) {
 export async function getLemonSqueezySubscription(subscriptionId: string) {
   try {
     const subscription = await getSubscription(subscriptionId);
+    if (!subscription.data) {
+      throw new Error('Failed to fetch subscription');
+    }
     return subscription.data.data;
   } catch (error) {
     console.error('Error fetching Lemon Squeezy subscription:', error);
@@ -69,6 +72,9 @@ export async function getLemonSqueezySubscription(subscriptionId: string) {
 export async function cancelLemonSqueezySubscription(subscriptionId: string) {
   try {
     const result = await cancelSubscription(subscriptionId);
+    if (!result.data) {
+      throw new Error('Failed to cancel subscription');
+    }
     return result.data.data;
   } catch (error) {
     console.error('Error canceling Lemon Squeezy subscription:', error);
