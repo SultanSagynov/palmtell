@@ -16,7 +16,33 @@ import {
   Loader2,
   Users
 } from "lucide-react";
-import { CompatibilityReading } from "@/lib/compatibility";
+// import { CompatibilityReading } from "@/lib/compatibility";
+
+interface CompatibilityReading {
+  profileA: {
+    name: string;
+    sign?: string;
+  };
+  profileB: {
+    name: string;
+    sign?: string;
+  };
+  overallScore: number;
+  summary: string;
+  categories: {
+    communication: { score: number; description: string };
+    emotional: { score: number; description: string };
+    intellectual: { score: number; description: string };
+    physical: { score: number; description: string };
+    strengths: string[];
+    challenges: string[];
+  };
+  zodiacCompatibility?: {
+    signA: string;
+    signB: string;
+    description: string;
+  };
+}
 
 interface Profile {
   id: string;
