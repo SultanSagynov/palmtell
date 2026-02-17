@@ -2,12 +2,12 @@ import { Redis } from "@upstash/redis";
 import OpenAI from "openai";
 
 const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+  url: process.env.UPSTASH_REDIS_REST_URL || "",
+  token: process.env.UPSTASH_REDIS_REST_TOKEN || "",
 });
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
+  apiKey: process.env.OPENAI_API_KEY || "",
 });
 
 const ZODIAC_SIGNS = [
@@ -39,10 +39,19 @@ export async function getDailyHoroscope(sign: string): Promise<any> {
   const today = new Date().toISOString().split('T')[0];
   const cacheKey = `horoscope:daily:${sign}:${today}`;
   
-  // Check cache first
-  const cached = await redis.get(cacheKey);
-  if (cached) {
-    return cached;
+  try {
+    // Check if Redis is configured
+    if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+      console.warn("Redis not configured, skipping cache");
+    } else {
+      // Try to get from cache first
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+  } catch (error) {
+    console.error("Error checking cache:", error);
   }
 
   try {
@@ -50,7 +59,7 @@ export async function getDailyHoroscope(sign: string): Promise<any> {
     const response = await fetch(`https://aztro.sameerkumar.website/?sign=${sign}&day=today`, {
       method: 'POST',
       headers: {
-        'X-RapidAPI-Key': process.env.RAPIDAPI_KEY!,
+        'X-RapidAPI-Key': process.env.RAPIDAPI_KEY || "",
         'X-RapidAPI-Host': 'aztro.sameerkumar.website'
       }
     });

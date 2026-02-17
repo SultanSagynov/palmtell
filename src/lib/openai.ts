@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { PalmAnalysis } from "@/types";
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
+  apiKey: process.env.OPENAI_API_KEY || "",
 });
 
 const VALIDATION_PROMPT = `Look at this image. Does it contain a human palm facing the camera?
@@ -22,6 +22,10 @@ Return ONLY valid JSON with this exact structure — no text outside the JSON:
 
 export async function validatePalmImage(imageUrl: string): Promise<{ valid: boolean; error?: string }> {
   try {
+    if (!process.env.OPENAI_API_KEY) {
+      return { valid: false, error: "openai_not_configured" };
+    }
+    
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       temperature: 0.1,
@@ -48,6 +52,10 @@ export async function validatePalmImage(imageUrl: string): Promise<{ valid: bool
 
 export async function analyzePalm(imageUrl: string): Promise<PalmAnalysis> {
   try {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OpenAI API key not configured");
+    }
+    
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       temperature: 0.3,

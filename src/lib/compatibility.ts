@@ -3,7 +3,7 @@ import { PalmAnalysis } from "@/types";
 import { getZodiacSign } from "./horoscope";
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
+  apiKey: process.env.OPENAI_API_KEY || "",
 });
 
 interface ProfileData {
@@ -48,6 +48,9 @@ export async function generateCompatibilityReading(
   profileB: ProfileData
 ): Promise<CompatibilityReading> {
   try {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OpenAI API key not configured");
+    }
     // Get zodiac signs if DOB available
     const signA = profileA.profile.dob ? getZodiacSign(profileA.profile.dob) : null;
     const signB = profileB.profile.dob ? getZodiacSign(profileB.profile.dob) : null;
