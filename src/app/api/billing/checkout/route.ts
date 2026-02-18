@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       userEmail: user.email,
     });
 
-    return NextResponse.json({ url: checkoutUrl });
+    return NextResponse.json({ checkoutUrl, url: checkoutUrl }); // Return both for compatibility
   } catch (error) {
     console.error("Lemon Squeezy checkout error:", error);
     return NextResponse.json(

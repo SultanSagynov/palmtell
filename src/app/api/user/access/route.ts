@@ -10,7 +10,7 @@ export async function GET() {
   }
 
   try {
-    const user = await db.user.findUnique({
+    let user = await db.user.findUnique({
       where: { clerkId },
       include: { subscription: true },
     });
@@ -19,13 +19,28 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    // Activate trial for new users on first access (if not already activated)
+    if (!user.trialStartedAt && !user.subscription?.id) {
+      const now = new Date();
+      const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      
+      user = await db.user.update({
+        where: { id: user.id },
+        data: {
+          trialStartedAt: now,
+          trialExpiresAt: sevenDaysFromNow,
+        },
+        include: { subscription: true },
+      });
+    }
+
     const tier = getAccessTier(user, user.subscription);
     const profileLimit = getProfileLimit(tier);
     const readingLimit = getReadingLimit(tier);
     
     return NextResponse.json({
       tier,
-      accessTier: tier, // Also provide as accessTier for compatibility
+      accessTier: tier,
       profileLimit,
       readingLimit,
       trialStartedAt: user.trialStartedAt?.toISOString(),

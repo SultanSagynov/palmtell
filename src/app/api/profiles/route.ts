@@ -41,13 +41,28 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await db.user.findUnique({
+    let user = await db.user.findUnique({
       where: { clerkId },
       include: { subscription: true, profiles: true },
     });
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Activate trial for new users on first profile creation
+    if (!user.trialStartedAt && !user.subscription?.id) {
+      const now = new Date();
+      const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      
+      user = await db.user.update({
+        where: { id: user.id },
+        data: {
+          trialStartedAt: now,
+          trialExpiresAt: sevenDaysFromNow,
+        },
+        include: { subscription: true, profiles: true },
+      });
     }
 
     const tier = getAccessTier(user, user.subscription);
