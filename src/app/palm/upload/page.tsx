@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useMediaPipeHands } from "@/hooks/use-mediapipe-hands";
-import { Hand, Upload, Camera, AlertCircle, Calendar } from "lucide-react";
+import { Hand, Upload, Camera, AlertCircle, Calendar, Sparkles, CheckCircle } from "lucide-react";
 import { DISCLAIMER } from "@/lib/constants";
 
 export default function PalmUploadPage() {
@@ -130,17 +130,24 @@ export default function PalmUploadPage() {
   const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto space-y-8">
           {/* Header */}
-          <div className="text-center space-y-4">
-            <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
-              <Hand className="h-8 w-8 text-primary" />
+          <div className="text-center space-y-6">
+            <div className="relative">
+              <div className="w-20 h-20 mx-auto bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Hand className="h-10 w-10 text-white" />
+              </div>
+              <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
+                <Sparkles className="h-3 w-3 text-white" />
+              </div>
             </div>
-            <div>
-              <h1 className="font-serif text-3xl font-bold">Setup Your Palm Reading</h1>
-              <p className="text-muted-foreground mt-2">
+            <div className="space-y-3">
+              <h1 className="font-bold text-4xl bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                Setup Your Palm Reading
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400 text-lg">
                 Upload your palm photo and birth date to get started
               </p>
             </div>
@@ -148,10 +155,12 @@ export default function PalmUploadPage() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Step 1: Palm Photo */}
-            <Card className="border-border/40">
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Hand className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <Hand className="h-4 w-4 text-white" />
+                  </div>
                   Step 1: Palm Photo
                 </CardTitle>
               </CardHeader>
@@ -174,30 +183,32 @@ export default function PalmUploadPage() {
                         <Button
                           type="button"
                           variant="outline"
-                          className="w-full h-24 flex flex-col gap-2"
+                          className="w-full h-24 flex flex-col gap-2 border-2 border-dashed border-indigo-300 dark:border-indigo-700 hover:border-indigo-500 dark:hover:border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950 dark:to-purple-950 hover:from-indigo-100 hover:to-purple-100 dark:hover:from-indigo-900 dark:hover:to-purple-900 transition-all duration-200"
                           onClick={() => document.getElementById('file-upload')?.click()}
                         >
-                          <Upload className="h-6 w-6" />
-                          Choose File
+                          <Upload className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+                          <span className="font-medium text-indigo-700 dark:text-indigo-300">Choose File</span>
                         </Button>
                       </div>
                       
                       <Button
                         type="button"
                         variant="outline"
-                        className="w-full h-24 flex flex-col gap-2"
+                        className="w-full h-24 flex flex-col gap-2 border-2 border-dashed border-purple-300 dark:border-purple-700 hover:border-purple-500 dark:hover:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-900 dark:hover:to-pink-900 transition-all duration-200"
                         onClick={handleCameraCapture}
                         disabled={isLoading}
                       >
-                        <Camera className="h-6 w-6" />
-                        {isLoading ? "Opening Camera..." : "Take Photo"}
+                        <Camera className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                        <span className="font-medium text-purple-700 dark:text-purple-300">
+                          {isLoading ? "Opening Camera..." : "Take Photo"}
+                        </span>
                       </Button>
                     </div>
 
                     {/* Photo Tips */}
-                    <div className="bg-muted/50 rounded-lg p-4">
-                      <h4 className="font-medium mb-2">Photo Tips:</h4>
-                      <ul className="text-sm text-muted-foreground space-y-1">
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 border border-blue-200 dark:border-blue-800 rounded-xl p-4 shadow-sm">
+                      <h4 className="font-semibold mb-3 text-blue-900 dark:text-blue-100">📸 Photo Tips:</h4>
+                      <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
                         <li>• Open your hand fully with palm facing camera</li>
                         <li>• Use good lighting, avoid shadows</li>
                         <li>• Ensure palm lines are clearly visible</li>
@@ -209,16 +220,22 @@ export default function PalmUploadPage() {
                   <div className="space-y-4">
                     {/* Preview */}
                     <div className="relative">
-                      <img
-                        src={previewUrl!}
-                        alt="Palm preview"
-                        className="w-full max-w-sm mx-auto rounded-lg border"
-                      />
+                      <div className="w-full max-w-sm mx-auto rounded-xl overflow-hidden border-2 border-green-200 dark:border-green-700 shadow-lg">
+                        <img
+                          src={previewUrl!}
+                          alt="Palm preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded-full flex items-center gap-1 text-xs font-medium">
+                        <CheckCircle className="h-3 w-3" />
+                        Valid Palm
+                      </div>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="absolute top-2 right-2"
+                        className="absolute top-2 right-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm hover:bg-white dark:hover:bg-gray-900"
                         onClick={() => {
                           setSelectedFile(null);
                           setPreviewUrl(null);
@@ -240,18 +257,22 @@ export default function PalmUploadPage() {
             </Card>
 
             {/* Step 2: Date of Birth */}
-            <Card className="border-border/40">
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                    <Calendar className="h-4 w-4 text-white" />
+                  </div>
                   Step 2: Date of Birth
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    We need this for horoscope insights and personalized readings
-                  </p>
+                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/50 dark:to-pink-950/50 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
+                    <p className="text-sm text-purple-800 dark:text-purple-200 font-medium">
+                      ✨ We need this for horoscope insights and personalized readings
+                    </p>
+                  </div>
                   
                   <div className="grid grid-cols-3 gap-4">
                     <div>
@@ -260,7 +281,7 @@ export default function PalmUploadPage() {
                         id="day"
                         value={dob.day}
                         onChange={(e) => setDob(prev => ({ ...prev, day: e.target.value }))}
-                        className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background"
+                        className="w-full mt-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
                       >
                         <option value="">Day</option>
                         {days.map(day => (
@@ -275,7 +296,7 @@ export default function PalmUploadPage() {
                         id="month"
                         value={dob.month}
                         onChange={(e) => setDob(prev => ({ ...prev, month: e.target.value }))}
-                        className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background"
+                        className="w-full mt-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
                       >
                         <option value="">Month</option>
                         {months.map(month => (
@@ -290,7 +311,7 @@ export default function PalmUploadPage() {
                         id="year"
                         value={dob.year}
                         onChange={(e) => setDob(prev => ({ ...prev, year: e.target.value }))}
-                        className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background"
+                        className="w-full mt-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
                       >
                         <option value="">Year</option>
                         {years.map(year => (
@@ -315,10 +336,20 @@ export default function PalmUploadPage() {
             <Button
               type="submit"
               disabled={!selectedFile || !dob.day || !dob.month || !dob.year || isUploading}
-              className="w-full"
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-4 rounded-xl shadow-lg transition-all duration-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               size="lg"
             >
-              {isUploading ? "Uploading..." : "Continue to Confirmation"}
+              {isUploading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-5 w-5 mr-2" />
+                  Continue to Confirmation
+                </>
+              )}
             </Button>
           </form>
 

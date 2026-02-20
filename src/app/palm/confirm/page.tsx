@@ -4,9 +4,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-// import { Checkbox } from "@/components/ui/checkbox";
-import { Hand, AlertTriangle, Check, Loader2 } from "lucide-react";
+import { Hand, AlertTriangle, Check, Loader2, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { format } from "date-fns";
 
 export default function PalmConfirmPage() {
   const [isConfirmed, setIsConfirmed] = useState(false);
@@ -15,18 +15,34 @@ export default function PalmConfirmPage() {
   const [sessionData, setSessionData] = useState<{
     photoUrl?: string;
     dob?: string;
+    photoKey?: string;
   } | null>(null);
   
   const router = useRouter();
 
   useEffect(() => {
-    // Check if we have session data (in real implementation, this would come from cookies/session)
-    // For now, we'll simulate having session data
-    const mockSessionData = {
-      photoUrl: "/api/temp-palm-preview", // This would be the actual temp image URL
-      dob: "March 15, 1990" // This would be formatted from the session
+    const fetchSessionData = async () => {
+      try {
+        const response = await fetch('/api/palm/session');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.photoKey && data.dob) {
+            const photoUrl = `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL || 'https://palmtell.s3.amazonaws.com'}/${data.photoKey}`;
+            const formattedDob = format(new Date(data.dob), 'MMMM d, yyyy');
+            setSessionData({
+              photoUrl,
+              dob: formattedDob,
+              photoKey: data.photoKey
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch session data:', error);
+        setSessionData(null);
+      }
     };
-    setSessionData(mockSessionData);
+    
+    fetchSessionData();
   }, []);
 
   const handleConfirm = async () => {
@@ -85,51 +101,79 @@ export default function PalmConfirmPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto space-y-8">
           {/* Header */}
-          <div className="text-center space-y-4">
-            <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
-              <Hand className="h-8 w-8 text-primary" />
+          <div className="text-center space-y-6">
+            <div className="relative">
+              <div className="w-20 h-20 mx-auto bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Hand className="h-10 w-10 text-white" />
+              </div>
+              <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
+                <Sparkles className="h-3 w-3 text-white" />
+              </div>
             </div>
-            <div>
-              <h1 className="font-serif text-3xl font-bold">Confirm Your Details</h1>
-              <p className="text-muted-foreground mt-2">
+            <div className="space-y-3">
+              <h1 className="font-bold text-4xl bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                Confirm Your Details
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400 text-lg">
                 Step 3 of 3 - Please review and confirm your information
               </p>
             </div>
           </div>
 
           {/* Confirmation Card */}
-          <Card className="border-border/40">
+          <Card className="border-0 shadow-xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Review Your Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Palm Photo Preview */}
-              <div className="space-y-3">
-                <h3 className="font-medium">Palm Photo</h3>
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Palm Photo</h3>
                 <div className="relative w-full max-w-sm mx-auto">
-                  <div className="aspect-[4/5] bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center">
-                    <div className="text-center space-y-2">
-                      <Hand className="h-12 w-12 mx-auto text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">Palm photo uploaded</p>
+                  {sessionData?.photoUrl ? (
+                    <div className="aspect-[4/5] rounded-xl overflow-hidden border-2 border-gray-200 dark:border-gray-700 shadow-lg">
+                      <img 
+                        src={sessionData.photoUrl} 
+                        alt="Your palm photo" 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          target.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                      <div className="hidden aspect-[4/5] bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900 dark:to-purple-900 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center">
+                        <div className="text-center space-y-2">
+                          <Hand className="h-12 w-12 mx-auto text-gray-400" />
+                          <p className="text-sm text-gray-500">Palm photo uploaded</p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="aspect-[4/5] bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900 dark:to-purple-900 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center">
+                      <div className="text-center space-y-2">
+                        <Hand className="h-12 w-12 mx-auto text-gray-400" />
+                        <p className="text-sm text-gray-500">Palm photo uploaded</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Birth Date */}
-              <div className="space-y-3">
-                <h3 className="font-medium">Date of Birth</h3>
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="text-center font-medium">{sessionData.dob}</p>
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Date of Birth</h3>
+                <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950 dark:to-purple-950 rounded-xl border border-indigo-200 dark:border-indigo-800">
+                  <p className="text-center font-semibold text-lg text-indigo-900 dark:text-indigo-100">{sessionData?.dob || 'Loading...'}</p>
                 </div>
               </div>
 
               {/* Important Notice */}
-              <div className="bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/50 dark:to-orange-950/50 border border-amber-200 dark:border-amber-800 rounded-xl p-5 shadow-sm">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
                   <div className="space-y-2">
@@ -191,7 +235,7 @@ export default function PalmConfirmPage() {
                 <Button
                   onClick={handleConfirm}
                   disabled={!isConfirmed || isValidating}
-                  className="flex-1"
+                  className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-3 rounded-xl shadow-lg transition-all duration-200 hover:shadow-xl"
                 >
                   {isValidating ? (
                     <>
