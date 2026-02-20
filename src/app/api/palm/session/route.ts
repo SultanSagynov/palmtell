@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPalmSession } from "@/lib/session-storage";
+import { getSignedR2Url } from "@/lib/r2";
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,8 +22,18 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Generate signed URL for image preview
+    let photoUrl: string | null = null;
+    try {
+      photoUrl = await getSignedR2Url(tempData.photo_key);
+    } catch (error) {
+      console.error("Failed to generate signed URL for preview:", error);
+      // Continue without photo URL - the UI will handle the fallback
+    }
+
     return NextResponse.json({
       photoKey: tempData.photo_key,
+      photoUrl,
       dob: tempData.dob,
       confirmed: tempData.confirmed
     });

@@ -27,10 +27,9 @@ export default function PalmConfirmPage() {
         if (response.ok) {
           const data = await response.json();
           if (data.photoKey && data.dob) {
-            const photoUrl = `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL || 'https://palmtell.s3.amazonaws.com'}/${data.photoKey}`;
             const formattedDob = format(new Date(data.dob), 'MMMM d, yyyy');
             setSessionData({
-              photoUrl,
+              photoUrl: data.photoUrl, // Use signed URL from API
               dob: formattedDob,
               photoKey: data.photoKey
             });

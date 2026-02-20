@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPalmSession, confirmPalmSession } from "@/lib/session-storage";
 import { validatePalmImage } from "@/lib/palm-validation";
+import { getSignedR2Url } from "@/lib/r2";
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,18 +25,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate required environment variables
-    if (!process.env.R2_PUBLIC_URL) {
-      console.error("Palm confirmation failed: R2_PUBLIC_URL not configured");
+    // Generate signed URL for secure access
+    let imageUrl: string;
+    try {
+      imageUrl = await getSignedR2Url(tempData.photo_key);
+      console.log(`Generated signed URL for palm validation: ${imageUrl.substring(0, 100)}...`);
+    } catch (error) {
+      console.error("Failed to generate signed URL:", error);
       return NextResponse.json(
-        { error: "Image storage not properly configured" },
+        { error: "Failed to access uploaded image" },
         { status: 500 }
       );
     }
-
-    // Construct image URL and validate
-    const imageUrl = `${process.env.R2_PUBLIC_URL}/${tempData.photo_key}`;
-    console.log(`Validating palm image at: ${imageUrl}`);
 
     // Run GPT-4o palm validation
     const validation = await validatePalmImage(imageUrl);

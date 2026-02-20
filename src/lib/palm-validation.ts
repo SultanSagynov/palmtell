@@ -32,8 +32,11 @@ export interface PalmValidationResult {
 export async function validatePalmImage(imageUrl: string): Promise<PalmValidationResult> {
   try {
     if (!process.env.OPENAI_API_KEY) {
+      console.error("OpenAI API key not configured");
       return { is_valid: false, reason: "Palm validation service not configured" };
     }
+
+    console.log(`Starting palm validation for image URL: ${imageUrl.substring(0, 100)}...`);
     
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -51,10 +54,36 @@ export async function validatePalmImage(imageUrl: string): Promise<PalmValidatio
       max_tokens: 150
     });
 
-    const result = JSON.parse(response.choices[0].message.content || "{}");
+    if (!response.choices[0]?.message?.content) {
+      console.error("OpenAI returned empty response");
+      return { is_valid: false, reason: "Palm validation service returned invalid response" };
+    }
+
+    const result = JSON.parse(response.choices[0].message.content);
+    console.log(`Palm validation result:`, result);
     return result as PalmValidationResult;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Palm validation error:", error);
-    return { is_valid: false, reason: "Palm validation failed" };
+    
+    // Handle specific OpenAI API errors
+    if (error?.status === 400) {
+      if (error?.code === 'invalid_image_url') {
+        return { is_valid: false, reason: "Unable to access the uploaded image. Please try uploading again." };
+      }
+      if (error?.error?.message?.includes('image')) {
+        return { is_valid: false, reason: "Invalid image format. Please upload a clear photo of your palm." };
+      }
+    }
+    
+    if (error?.status === 429) {
+      return { is_valid: false, reason: "Palm validation service is busy. Please try again in a moment." };
+    }
+    
+    if (error?.status >= 500) {
+      return { is_valid: false, reason: "Palm validation service temporarily unavailable. Please try again." };
+    }
+    
+    // Generic fallback
+    return { is_valid: false, reason: "Palm validation failed. Please try again." };
   }
 }
