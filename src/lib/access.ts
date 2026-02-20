@@ -1,8 +1,10 @@
-import type { TempUserWithSubscription, TempSubscription } from "@/types/temp-user";
+export type AccessTier = "trial" | "basic" | "pro" | "ultimate" | "expired";
 
-export type AccessTier = "basic" | "pro" | "ultimate" | "expired";
-
-export function getAccessTier(user: TempUserWithSubscription, subscription: TempSubscription | null): AccessTier {
+export function getAccessTier(user: any, subscription: any): AccessTier {
+  // Check if user has trial access
+  if (user.trialExpiresAt && new Date(user.trialExpiresAt) > new Date() && !subscription) {
+    return "trial";
+  }
   // Check if user has an active subscription
   if (subscription && subscription.status === "active") {
     return subscription.plan as AccessTier;
@@ -13,9 +15,9 @@ export function getAccessTier(user: TempUserWithSubscription, subscription: Temp
 
 export function isSectionAccessible(section: string, tier: AccessTier): boolean {
   const accessMatrix = {
-    personality: ["basic", "pro", "ultimate"],
-    life_path: ["basic", "pro", "ultimate"], 
-    career: ["basic", "pro", "ultimate"],
+    personality: ["trial", "basic", "pro", "ultimate"],
+    life_path: ["trial", "basic", "pro", "ultimate"], 
+    career: ["trial", "basic", "pro", "ultimate"],
     relationships: ["pro", "ultimate"],
     health: ["pro", "ultimate"],
     lucky: ["pro", "ultimate"],
@@ -24,8 +26,21 @@ export function isSectionAccessible(section: string, tier: AccessTier): boolean 
   return accessMatrix[section as keyof typeof accessMatrix]?.includes(tier) ?? false;
 }
 
+export function getProfileLimit(tier: AccessTier): number {
+  const limits = {
+    trial: 1,
+    basic: 1,
+    pro: 3,
+    ultimate: Infinity,
+    expired: 0,
+  };
+
+  return limits[tier];
+}
+
 export function getReadingLimit(tier: AccessTier): number {
   const limits = {
+    trial: 1,
     basic: 1,
     pro: 5,
     ultimate: Infinity,

@@ -15,10 +15,13 @@ model User {
   palmPhotoUrl    String?   @map("palm_photo_url")
   dob             DateTime?
   palmConfirmed   Boolean   @default(false) @map("palm_confirmed")
+  trialStartedAt  DateTime? @map("trial_started_at") @db.Timestamptz
+  trialExpiresAt  DateTime? @map("trial_expires_at") @db.Timestamptz
   createdAt       DateTime  @default(now()) @map("created_at")
 
   // Relations
   subscription Subscription?
+  profiles     Profile[]
   readings     Reading[]
   horoscopes   Horoscope[]
 
@@ -28,11 +31,15 @@ model User {
 model Subscription {
   id                   String   @id @default(cuid())
   userId               String   @unique @map("user_id")
+  stripeCustomerId     String?  @map("stripe_customer_id")
+  stripeSubscriptionId String?  @map("stripe_subscription_id")
   lsCustomerId         String?  @map("ls_customer_id")
   lsSubscriptionId     String?  @map("ls_subscription_id")
   lsVariantId          String?  @map("ls_variant_id")
   plan                 String   // 'basic' | 'pro' | 'ultimate'
   status               String   // 'active' | 'past_due' | 'canceled' | 'expired'
+  currentPeriodEnd     DateTime? @map("current_period_end") @db.Timestamptz
+  cancelsAt            DateTime? @map("cancels_at") @db.Timestamptz
   renewsAt             DateTime? @map("renews_at") @db.Timestamptz
   endsAt               DateTime? @map("ends_at") @db.Timestamptz
   createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
@@ -42,14 +49,34 @@ model Subscription {
   @@map("subscriptions")
 }
 
+model Profile {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  name         String
+  dob          DateTime? @db.Date
+  avatarEmoji  String?  @map("avatar_emoji")
+  isDefault    Boolean  @default(false) @map("is_default")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readings   Reading[]
+  horoscopes Horoscope[]
+
+  @@map("profiles")
+}
+
 model Reading {
   id           String   @id @default(cuid())
   userId       String   @map("user_id")
+  profileId    String   @map("profile_id")
   imageUrl     String   @map("image_url")
+  status       String?  @default("pending")
+  error        String?
   analysisJson Json?    @map("analysis_json")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@map("readings")
 }
@@ -57,13 +84,15 @@ model Reading {
 model Horoscope {
   id          String   @id @default(cuid())
   userId      String   @map("user_id")
+  profileId   String   @map("profile_id")
   date        DateTime @db.Date
   sign        String
   contentJson Json?    @map("content_json")
   generatedAt DateTime @default(now()) @map("generated_at") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, date])
+  @@unique([profileId, date])
   @@map("horoscopes")
 }

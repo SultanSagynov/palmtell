@@ -31,12 +31,8 @@ export async function POST(req: Request) {
       const newTier = planHierarchy[plan as keyof typeof planHierarchy] || 0;
       
       if (currentTier !== newTier) {
-        // Store pending plan change for UI messaging
-        await db.subscription.update({
-          where: { userId: user.id },
-          data: { pendingPlan: plan },
-        });
-        
+        // For plan changes, user needs to cancel current subscription first
+        // We don't need to store pending plan - just return the error
         return NextResponse.json({ 
           error: "Plan change requires canceling current subscription first",
           requiresCancellation: true,

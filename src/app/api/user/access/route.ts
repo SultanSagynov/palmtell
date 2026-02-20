@@ -1,8 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getAccessTier, getReadingLimit } from "@/lib/access";
-import type { TempUserWithSubscription } from "@/types/temp-user";
+import { getAccessTier, getProfileLimit, getReadingLimit } from "@/lib/access";
 
 export async function GET() {
   const { userId: clerkId } = await auth();
@@ -14,22 +13,21 @@ export async function GET() {
     const user = await db.user.findUnique({
       where: { clerkId },
       include: { subscription: true },
-    }) as TempUserWithSubscription | null;
+    });
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const tier = getAccessTier(user, user.subscription);
+    const profileLimit = getProfileLimit(tier);
     const readingLimit = getReadingLimit(tier);
     
     return NextResponse.json({
       tier,
       accessTier: tier,
+      profileLimit,
       readingLimit,
-      palmConfirmed: user.palmConfirmed,
-      palmPhotoUrl: user.palmPhotoUrl,
-      dob: user.dob?.toISOString(),
       subscription: user.subscription ? {
         status: user.subscription.status,
         plan: user.subscription.plan,

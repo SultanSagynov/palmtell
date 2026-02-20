@@ -31,14 +31,12 @@ export async function POST() {
       where: { userId: user.id },
       data: { 
         status: 'canceled',
-        // Keep access until current period end
-        cancelsAt: user.subscription.currentPeriodEnd,
       },
     });
 
     // Send cancellation email
     try {
-      const endDate = user.subscription.currentPeriodEnd?.toLocaleDateString() || 'end of current period';
+      const endDate = user.subscription.endsAt?.toLocaleDateString() || 'end of current period';
       const cancelEmail = createSubscriptionCanceledEmail(
         user.email, 
         user.name || "there", 

@@ -55,7 +55,7 @@ export async function POST(req: Request) {
             lsCustomerId: subscription.attributes.customer_id.toString(),
             plan,
             status: subscription.attributes.status,
-            currentPeriodEnd: subscription.attributes.renews_at 
+            renewsAt: subscription.attributes.renews_at 
               ? new Date(subscription.attributes.renews_at) 
               : null,
           },
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
             lsCustomerId: subscription.attributes.customer_id.toString(),
             plan,
             status: subscription.attributes.status,
-            currentPeriodEnd: subscription.attributes.renews_at 
+            renewsAt: subscription.attributes.renews_at 
               ? new Date(subscription.attributes.renews_at) 
               : null,
           },
@@ -86,11 +86,9 @@ export async function POST(req: Request) {
           data: {
             plan,
             status: subscription.attributes.status,
-            currentPeriodEnd: subscription.attributes.renews_at 
+            renewsAt: subscription.attributes.renews_at 
               ? new Date(subscription.attributes.renews_at) 
               : null,
-            // Clear pending plan if update successful
-            pendingPlan: null,
           },
         });
         break;
@@ -103,7 +101,7 @@ export async function POST(req: Request) {
           where: { userId },
           data: { 
             status: 'canceled',
-            cancelsAt: subscription.attributes.ends_at 
+            endsAt: subscription.attributes.ends_at 
               ? new Date(subscription.attributes.ends_at)
               : null,
           },
@@ -144,7 +142,7 @@ export async function POST(req: Request) {
           where: { userId },
           data: { 
             status: 'active',
-            currentPeriodEnd: subscription.attributes.renews_at 
+            renewsAt: subscription.attributes.renews_at 
               ? new Date(subscription.attributes.renews_at) 
               : null,
           },
